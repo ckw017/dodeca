@@ -47,11 +47,11 @@ fn rot1(repr: u32) -> u32 {
 
 fn rot2(mut repr: u32) -> u32 {
     let mut result = 0;
-    for i in 0..30 {
+    for offset in ROT2_MAP {
         if repr == 0 {
             break;
         }
-        result |= (repr % 2) << ROT2_MAP[i];
+        result |= (repr % 2) << offset;
         repr >>= 1;
     }
     result
@@ -98,7 +98,7 @@ fn main() {
 
     let mut pair_masks = Vec::new();
     for i in 0..edge_masks.len() {
-        for j in (i+1)..edge_masks.len() {
+        for j in (i + 1)..edge_masks.len() {
             if edge_masks[i] & edge_masks[j] != 0 {
                 let mask: u32 = 2u32.pow(i as u32) | 2u32.pow(j as u32);
                 pair_masks.push(mask);
