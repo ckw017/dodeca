@@ -1,3 +1,5 @@
+use roaring::bitmap::RoaringBitmap;
+
 // List of edges defined by the two points they span
 const EDGE_POINTS: [(u32, u32); 30] = [
     (0, 1),   //0
@@ -57,36 +59,34 @@ fn rot2(mut repr: u32) -> u32 {
     result
 }
 
-fn min_rot1(repr: u32) -> u32 {
-    let mut result = repr;
+fn skip_rot1(repr: u32, skip: &mut RoaringBitmap) {
     let mut base = repr;
+    skip.insert(base);
     for _ in 0..4 {
         base = rot1(base);
-        result = std::cmp::min(result, base);
-    }
-    result
+        skip.insert(base);
+    };
 }
 
-fn min_repr_no_flip(repr: u32) -> u32 {
-    let mut result = u32::MAX;
+fn skip_repr_no_flip(repr: u32, skip: &mut RoaringBitmap) {
     let start0 = repr;
-    result = std::cmp::min(result, min_rot1(start0));
     let start1 = rot2(start0);
-    result = std::cmp::min(result, min_rot1(start1));
     let start2 = rot2(start1);
-    result = std::cmp::min(result, min_rot1(start2));
     let start3 = rot2(start2);
-    result = std::cmp::min(result, min_rot1(start3));
     let start4 = rot2(rot2(rot1(rot1(rot1(rot1(start0))))));
-    result = std::cmp::min(result, min_rot1(start4));
     let start5 = rot2(rot2(rot1(rot1(rot1(start0)))));
-    result = std::cmp::min(result, min_rot1(start5));
-    result
+    skip_rot1(start0, skip);
+    skip_rot1(start1, skip);
+    skip_rot1(start2, skip);
+    skip_rot1(start3, skip);
+    skip_rot1(start4, skip);
+    skip_rot1(start5, skip);
 }
 
-fn min_repr(repr: u32) -> u32 {
+fn skip_repr(repr: u32, skip: &mut RoaringBitmap) {
     let flipped = rot1(rot2(rot1(repr)));
-    std::cmp::min(min_repr_no_flip(repr), min_repr_no_flip(flipped))
+    skip_repr_no_flip(repr, skip);
+    skip_repr_no_flip(flipped, skip);
 }
 
 fn main() {
@@ -109,28 +109,36 @@ fn main() {
     println!("{}", pair_masks.len());
 
     // Contains all of the valid edge sets
-    let mut all = roaring::bitmap::RoaringBitmap::new();
+    let mut all = RoaringBitmap::new();
     // Contains all of the edge sets where `i` edges are set
-    let mut curr = roaring::bitmap::RoaringBitmap::new();
+    let mut curr = RoaringBitmap::new();
+    // Contains all the edge sets that we can skip in curr
+    let mut skip = RoaringBitmap::new();
     // Contains all of the edge sets where `i + 1` edges are set
-    let mut next = roaring::bitmap::RoaringBitmap::new();
+    let mut next = RoaringBitmap::new();
     // Seed both maps with a single edge to start
     curr.insert(1);
     all.insert(1);
 
-    for i in 1..30 {
+    for i in 1..31 {
+        let mut round: u32 = 0;
         for parent in &curr {
+            if skip.contains(parent) {
+                continue;
+            }
+            skip_repr(parent, &mut skip);
+            all.insert(parent);
+            round += 1;
             for mask in &pair_masks {
                 if (mask & parent) != 0 && (mask | parent) != parent {
-                    let child = min_repr(mask | parent);
-                    all.insert(child);
-                    next.insert(child);
+                    next.insert(mask | parent);
                 }
             }
         }
-        println!("{} {}", i, curr.len());
+        println!("{} {}", i, round);
         curr = next;
-        next = roaring::bitmap::RoaringBitmap::new();
+        next = RoaringBitmap::new();
+        skip = RoaringBitmap::new()
     }
     println!("{}", all.len())
 }
